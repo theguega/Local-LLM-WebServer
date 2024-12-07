@@ -2,6 +2,7 @@ use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Deserialize)]
 struct ChatRequest {
@@ -10,6 +11,11 @@ struct ChatRequest {
 
 #[derive(Serialize)]
 struct ChatResponse {
+    response: String,
+}
+
+#[derive(Deserialize)]
+struct OllamaResponse {
     response: String,
 }
 
@@ -22,13 +28,40 @@ async fn handle_chat(req: web::Json<ChatRequest>) -> impl Responder {
         return HttpResponse::BadRequest().json("Message cannot be empty.");
     }
 
-    // Simulated response as a placeholder for the LLM model response
-    let fake_response = "This is a simulated response from the LLM model.";
+    let client = reqwest::Client::new();
+    let formatted_prompt = format!(
+        "Please format your response using markdown when appropriate. \
+        Use code blocks with language specification for code. \
+        Here's the user's message: {}",
+        req.message
+    );
 
-    // Return JSON response or handle error
-    HttpResponse::Ok().json(ChatResponse {
-        response: fake_response.to_string(),
-    })
+    let ollama_request = json!({
+        "model": "llama3.2",
+        "prompt": formatted_prompt,
+        "stream": false
+    });
+
+    match client
+        .post("http://localhost:11434/api/generate")
+        .json(&ollama_request)
+        .send()
+        .await
+    {
+        Ok(response) => match response.json::<OllamaResponse>().await {
+            Ok(ollama_response) => HttpResponse::Ok().json(ChatResponse {
+                response: ollama_response.response,
+            }),
+            Err(e) => {
+                eprintln!("Error parsing Ollama response: {:?}", e);
+                HttpResponse::InternalServerError().json("Error processing response from LLM")
+            }
+        },
+        Err(e) => {
+            eprintln!("Error calling Ollama: {:?}", e);
+            HttpResponse::InternalServerError().json("Error communicating with LLM")
+        }
+    }
 }
 
 #[actix_web::main]

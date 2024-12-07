@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import ReactMarkdown from 'react-markdown';
 
 const ChatInterface = () => {
     const [isClient, setIsClient] = useState(false);
     const [userInput, setUserInput] = useState("");
     const [messages, setMessages] = useState<{ text: string; type: "user" | "bot" }[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         // Set `isClient` to true only when this is running in the browser
@@ -55,32 +58,72 @@ const ChatInterface = () => {
     }
 
     return (
-        <div className="flex flex-col h-screen bg-gray-100">
-            <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex flex-col h-screen bg-[#343541]">
+            <div className="flex-1 overflow-y-auto">
                 {messages.map((msg, index) => (
                     <div
                         key={index}
-                        className={`p-2 rounded-lg mb-2 ${
-                            msg.type === "user" ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black self-start"
-                        }`}
+                        className={`p-4 ${msg.type === "user" ? "bg-[#343541]" : "bg-[#444654]"}`}
                     >
-                        {msg.type === "user" ? "You: " : "Bot: "}
-                        {msg.text}
+                        <div className="max-w-3xl mx-auto flex items-start space-x-4">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${msg.type === "user" ? "bg-[#5436DA]" : "bg-[#11A37F]"
+                                }`}>
+                                {msg.type === "user" ? "U" : "A"}
+                            </div>
+                            <div className="flex-1">
+                                {msg.type === "bot" ? (
+                                    <ReactMarkdown
+                                        className="text-white prose prose-invert max-w-none"
+                                        components={{
+                                            pre: ({ children, ...props }) => (
+                                                <pre className="bg-[#2D2D2D] p-4 rounded-lg overflow-x-auto" {...props}>
+                                                    {children}
+                                                </pre>
+                                            ),
+                                            code: ({ children, className, ...props }: any) => (
+                                                <code className={className ? `${className} bg-[#2D2D2D] px-1 rounded` : 'text-sm'} {...props}>
+                                                    {children}
+                                                </code>
+                                            ),
+                                        }}
+                                    >
+                                        {msg.text}
+                                    </ReactMarkdown>
+                                ) : (
+                                    <p className="text-white">{msg.text}</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 ))}
+                {error && (
+                    <div className="text-red-500 p-2">
+                        Error: {error}
+                    </div>
+                )}
+                {isLoading && (
+                    <div className="animate-pulse bg-gray-200 p-2 rounded-lg">
+                        Loading...
+                    </div>
+                )}
             </div>
-            <div className="p-4 bg-white flex space-x-2 border-t border-gray-300">
-                <input
-                    type="text"
-                    value={userInput}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your message here..."
-                    className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none"
-                />
-                <button onClick={handleSendMessage} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
-                    Send
-                </button>
+            <div className="border-t border-gray-700 p-4">
+                <div className="max-w-3xl mx-auto flex space-x-4">
+                    <input
+                        type="text"
+                        value={userInput}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Send a message..."
+                        className="flex-1 p-3 bg-[#40414F] text-white rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500"
+                    />
+                    <button
+                        onClick={handleSendMessage}
+                        className="bg-[#11A37F] text-white px-4 py-2 rounded-lg hover:bg-[#0F916F] transition-colors"
+                    >
+                        Send
+                    </button>
+                </div>
             </div>
         </div>
     );

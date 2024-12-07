@@ -2,18 +2,48 @@
 
 import React, { useEffect, useState } from "react";
 import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import { useStorage, ChatMessage } from './storage';
+
+const LoadingDots = () => (
+    <div className="flex space-x-2 p-4 bg-[#444654]">
+        <div className="max-w-3xl mx-auto flex items-start space-x-4">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#11A37F]">
+                A
+            </div>
+            <div className="flex space-x-2 items-center">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse delay-150"></div>
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse delay-300"></div>
+            </div>
+        </div>
+    </div>
+);
 
 const ChatInterface = () => {
     const [isClient, setIsClient] = useState(false);
     const [userInput, setUserInput] = useState("");
-    const [messages, setMessages] = useState<{ text: string; type: "user" | "bot" }[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const storage = useStorage();
 
     useEffect(() => {
-        // Set `isClient` to true only when this is running in the browser
         setIsClient(true);
+        // Load saved chat when component mounts
+        loadSavedChat();
     }, []);
+
+    const loadSavedChat = async () => {
+        try {
+            const savedMessages = await storage.loadChat();
+            if (savedMessages.length > 0) {
+                setMessages(savedMessages);
+            }
+        } catch (error) {
+            console.error('Error loading saved chat:', error);
+        }
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setUserInput(e.target.value);
@@ -22,27 +52,30 @@ const ChatInterface = () => {
     const handleSendMessage = async () => {
         if (!userInput.trim()) return;
 
-        // Display the user's message in the chat log
-        setMessages((prev) => [...prev, { text: userInput, type: "user" }]);
+        const newMessages = [...messages, { text: userInput, type: "user" as const }];
+        setMessages(newMessages);
         setUserInput("");
+        setIsLoading(true);
 
         try {
             const response = await fetch("http://127.0.0.1:8080/chat", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: userInput }),
             });
 
             if (response.ok) {
                 const data = await response.json();
-                setMessages((prev) => [...prev, { text: data.response, type: "bot" }]);
+                const updatedMessages = [...newMessages, { text: data.response, type: "bot" as const }];
+                setMessages(updatedMessages);
+                await storage.saveChat(updatedMessages);
             } else {
-                setMessages((prev) => [...prev, { text: "Sorry, there was an issue with the server.", type: "bot" }]);
+                setMessages(prev => [...prev, { text: "Sorry, there was an issue with the server.", type: "bot" }]);
             }
         } catch (error) {
-            setMessages((prev) => [...prev, { text: "There was an error processing your request.", type: "bot" }]);
+            setMessages(prev => [...prev, { text: "There was an error processing your request.", type: "bot" }]);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -51,11 +84,6 @@ const ChatInterface = () => {
             handleSendMessage();
         }
     };
-
-    // Show loading message while checking if we are on the client side
-    if (!isClient) {
-        return <div>Loading...</div>;
-    }
 
     return (
         <div className="flex flex-col h-screen bg-[#343541]">
@@ -75,16 +103,26 @@ const ChatInterface = () => {
                                     <ReactMarkdown
                                         className="text-white prose prose-invert max-w-none"
                                         components={{
-                                            pre: ({ children, ...props }) => (
-                                                <pre className="bg-[#2D2D2D] p-4 rounded-lg overflow-x-auto" {...props}>
-                                                    {children}
-                                                </pre>
-                                            ),
-                                            code: ({ children, className, ...props }: any) => (
-                                                <code className={className ? `${className} bg-[#2D2D2D] px-1 rounded` : 'text-sm'} {...props}>
-                                                    {children}
-                                                </code>
-                                            ),
+                                            code({node, inline, className, children, ...props}) {
+                                                const match = /language-(\w+)/.exec(className || '');
+                                                const language = match ? match[1] : '';
+
+                                                return !inline ? (
+                                                    <SyntaxHighlighter
+                                                        style={oneDark}
+                                                        language={language}
+                                                        PreTag="div"
+                                                        className="rounded-lg"
+                                                        {...props}
+                                                    >
+                                                        {String(children).replace(/\n$/, '')}
+                                                    </SyntaxHighlighter>
+                                                ) : (
+                                                    <code className="bg-[#2D2D2D] px-1 rounded" {...props}>
+                                                        {children}
+                                                    </code>
+                                                );
+                                            },
                                         }}
                                     >
                                         {msg.text}
@@ -96,16 +134,7 @@ const ChatInterface = () => {
                         </div>
                     </div>
                 ))}
-                {error && (
-                    <div className="text-red-500 p-2">
-                        Error: {error}
-                    </div>
-                )}
-                {isLoading && (
-                    <div className="animate-pulse bg-gray-200 p-2 rounded-lg">
-                        Loading...
-                    </div>
-                )}
+                {isLoading && <LoadingDots />}
             </div>
             <div className="border-t border-gray-700 p-4">
                 <div className="max-w-3xl mx-auto flex space-x-4">

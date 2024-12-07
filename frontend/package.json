@@ -9,10 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/prismjs": "^1.26.5",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "fs": "^0.0.1-security",
     "next": "15.0.3",
+    "prismjs": "^1.29.0",
     "react": "19.0.0-rc-66855b96-20241106",
     "react-dom": "19.0.0-rc-66855b96-20241106",
-    "react-markdown": "^9.0.1"
+    "react-markdown": "^9.0.1",
+    "react-syntax-highlighter": "^15.6.1"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.15",
